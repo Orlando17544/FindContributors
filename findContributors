@@ -1,0 +1,23 @@
+#!/bin/bash
+
+readarray -d '' files < <(find . -regextype egrep -regex '.+\.(java|js|ts|py)$' -print0)
+
+for file in "${files[@]}"; do
+	git blame "$file" >> gitBlames.txt
+done
+
+contributors=($(grep -Pio '(?<=^[a-z\d]{8} \()[^\d]+' gitBlames.txt | perl -p -e 's/ +$//g' | sort | uniq | perl -p -e 's/^(.)/"\1/g' | perl -p -e 's/(.)$/\1"/g' | perl -p -e 's/\n/ /g'))
+
+readarray -d '' contributors < <(grep -Pio '(?<=^[a-z\d]{8} \()[^\d]+' gitBlames.txt | perl -p -e 's/ +$//g' | sort | uniq | perl -p -e 's/\n/\x00/g')
+
+totalLines=$(wc -l gitBlames.txt | grep -Po '^\d+')
+
+for contributor in "${contributors[@]}"; do
+	currentLines=$(grep -Pic "$contributor" gitBlames.txt)
+
+	contribution=$(echo "scale=2; ${currentLines}/${totalLines} * 100" | bc)
+
+	echo "$contributor contribuyed with ${contribution}%"
+done
+
+rm gitBlames.txt
